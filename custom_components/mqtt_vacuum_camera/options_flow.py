@@ -6,7 +6,6 @@ Last Updated on version: 2026.2.0
 from copy import deepcopy
 from typing import Any, Dict, Optional
 
-from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult, OptionsFlow
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import floor_registry as fr
@@ -90,21 +89,18 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             raise ConfigEntryError("Config entry is required.")
         self.camera_config = config_entry
         self.unique_id = self.camera_config.unique_id
-        self.camera_options = {}
+        self.camera_options: dict[str, Any] = {}
         self.backup_options = deepcopy(dict(self.camera_config.options))
-        self.file_name = extract_file_name(self.unique_id)
+        self.file_name = extract_file_name(self.unique_id or "")
         self.is_alpha_enabled = False
         self.number_of_rooms = DEFAULT_ROOMS
         self.rooms_placeholders = DEFAULT_ROOMS_NAMES
         self.floors_data = dict(self.camera_config.options.get("floors_data", {}))
         self.current_floor = self.camera_config.options.get("current_floor", "floor_0")
-        self.old_rotation = self.camera_config.options.get("rotate_image", "0")
-        self.selected_floor = None
-        self._rotation_changed = False
+        self.selected_floor: Optional[str] = None
         # Initialize schemas using dataclass
         self._schemas = OptionsSchemas(
-            config_entry=config_entry,
-            is_alpha_enabled=self.is_alpha_enabled
+            config_entry=config_entry, is_alpha_enabled=self.is_alpha_enabled
         )
 
     def _get_ha_floors(self) -> list[dict[str, str]]:
@@ -116,11 +112,12 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
         try:
             floor_reg = fr.async_get(self.hass)
             floors = list(floor_reg.async_list_floors())
-            return [
-                {"floor_id": floor.floor_id, "name": floor.name}
-                for floor in floors
-            ] if floors else []
-        except Exception as e:
+            return (
+                [{"floor_id": floor.floor_id, "name": floor.name} for floor in floors]
+                if floors
+                else []
+            )
+        except (AttributeError, ValueError, KeyError) as e:
             LOGGER.warning("Failed to get HA floors: %s", e)
             return []
 
@@ -161,7 +158,9 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
 
         return floor_options
 
-    async def async_step_init(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_init(
+        self, user_input=None  # pylint: disable=unused-argument
+    ) -> ConfigFlowResult:
         """Start the options menu configuration."""
         rooms_data = RoomStore(self.file_name)
         self.number_of_rooms = rooms_data.get_rooms_count()
@@ -180,11 +179,15 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             menu_options=["image_opt", "colours", "materials", "save_options"],
         )
 
-    async def async_step_main_menu(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_main_menu(
+        self, user_input=None  # pylint: disable=unused-argument
+    ) -> ConfigFlowResult:
         """Return to main menu."""
         return await self.async_step_init()
 
-    async def async_step_image_opt(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_image_opt(
+        self, user_input=None  # pylint: disable=unused-argument
+    ) -> ConfigFlowResult:
         """Handle image options menu."""
         return self.async_show_menu(
             step_id="image_opt",
@@ -198,7 +201,9 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             ],
         )
 
-    async def async_step_draw_elements(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_draw_elements(
+        self, user_input=None  # pylint: disable=unused-argument
+    ) -> ConfigFlowResult:
         """Handle draw elements menu."""
         return self.async_show_menu(
             step_id="draw_elements",
@@ -209,7 +214,9 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             ],
         )
 
-    async def async_step_colours(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_colours(
+        self, user_input=None  # pylint: disable=unused-argument
+    ) -> ConfigFlowResult:
         """Handle colours menu."""
         menu_options = ["base_colours"]
 
@@ -219,8 +226,7 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             case n if 1 < n <= 8:
                 menu_options.extend(["rooms_colours_1"])
             case _:
-                menu_options.extend(["rooms_colours_1",
-                                     "rooms_colours_2"])
+                menu_options.extend(["rooms_colours_1", "rooms_colours_2"])
 
         if self.is_alpha_enabled:
             menu_options.append("transparency")
@@ -232,7 +238,9 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             menu_options=menu_options,
         )
 
-    async def async_step_transparency(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_transparency(
+        self, user_input=None  # pylint: disable=unused-argument
+    ) -> ConfigFlowResult:
         """Handle transparency menu"""
 
         menu_options = ["alpha_1"]
@@ -283,12 +291,9 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
     ):
         """Handle basic image settings."""
         if user_input is not None:
-            # Get old and new rotation values
-            new_rotation = user_input.get(ATTR_ROTATE)
-            # Update camera options
             self.camera_options.update(
                 {
-                    "rotate_image": new_rotation,
+                    "rotate_image": user_input.get(ATTR_ROTATE),
                     "margins": user_input.get(ATTR_MARGINS),
                     "aspect_ratio": user_input.get(CONF_ASPECT_RATIO),
                     "zoom_lock_ratio": user_input.get(CONF_ZOOM_LOCK_RATIO),
@@ -297,48 +302,6 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
                     "mop_path_width": user_input.get(CONF_MOP_PATH_WIDTH),
                 }
             )
-
-            # If rotation changed and multi-floor is enabled, update current floor data
-            if (
-                self.old_rotation != new_rotation
-                and self.floors_data
-                and self.current_floor
-            ):
-                LOGGER.debug(
-                    "Rotation changed from %s to %s, resetting trims for floor %s",
-                    self.old_rotation,
-                    new_rotation,
-                    self.current_floor,
-                )
-                # Create reset trims (0,0,0,0)
-                reset_trims = TrimsData(
-                    trim_up=0,
-                    trim_down=0,
-                    trim_left=0,
-                    trim_right=0,
-                    floor=self.current_floor,
-                )
-                # Create FloorData with new rotation and reset trims
-                floor_data_dict = self.floors_data.get(self.current_floor, {})
-                if floor_data_dict:
-                    floor_data = FloorData(
-                        trims=reset_trims,
-                        map_name=floor_data_dict.get("map_name", ""),
-                        map_data=floor_data_dict.get("map_data"),
-                        rotation=int(new_rotation),
-                    )
-
-                    # Update floors_data
-                    updated_floors = dict(self.floors_data)
-                    updated_floors[self.current_floor] = floor_data.to_dict()
-                    self.floors_data = updated_floors
-
-                    # Update camera_options
-                    self.camera_options.update({CONF_FLOORS_DATA: updated_floors})
-
-                    # Set flag to show notification
-                    self._rotation_changed = True
-
             return await self.async_step_image_opt()
 
         return self.async_show_form(
@@ -346,7 +309,9 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             data_schema=self._schemas.image_schema,
         )
 
-    async def async_step_floor_management(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_floor_management(
+        self, user_input=None  # pylint: disable=unused-argument
+    ) -> ConfigFlowResult:
         """Handle floor management menu."""
         return self.async_show_menu(
             step_id="floor_management",
@@ -401,7 +366,9 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             hass_data = self.hass.data.get(DOMAIN, {}).get(self.camera_config.entry_id)
             if hass_data and "coordinator" in hass_data:
                 coordinator = hass_data["coordinator"]
-                if hasattr(coordinator, "context") and hasattr(coordinator.context, "shared"):
+                if hasattr(coordinator, "context") and hasattr(
+                    coordinator.context, "shared"
+                ):
                     vacuum_ip = coordinator.context.shared.vacuum_ips or ""
         except (AttributeError, KeyError):
             # If we can't get the vacuum IP, use empty string
@@ -467,7 +434,7 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
                     "color_background": user_input.get(COLOR_BACKGROUND),
                 }
             )
-            self.is_alpha_enabled = user_input.get(IS_ALPHA)
+            self.is_alpha_enabled = bool(user_input.get(IS_ALPHA))
             if self.is_alpha_enabled:
                 self.is_alpha_enabled = False
                 return await self.async_step_alpha_1()
@@ -635,21 +602,14 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
 
     # Floor Management Steps
 
-    async def async_step_update_floor_data(self, user_input=None):
-        """Update floor data with current trims and rotation."""
+    async def async_step_update_floor_data(
+        self, user_input=None  # pylint: disable=unused-argument
+    ):
+        """Update floor data with current trims."""
         entry = self.camera_config.entry_id
         coordinator = self.hass.data[DOMAIN][entry]["coordinator"]
-        # Save current trims from coordinator
 
-        new_rotation = self.camera_options.get("rotate_image")
-        if new_rotation is None:
-            current_rotation = int(self.old_rotation)
-        else:
-            current_rotation = int(new_rotation)
-            if str(current_rotation) != str(self.old_rotation):
-                self._rotation_changed = True
-
-        # If multi-floor is enabled, update the current floor's FloorData with rotation
+        # If multi-floor is enabled, update the current floor's FloorData
         if self.floors_data and self.current_floor:
             # Get existing floor data
             floor_data_dict = self.floors_data.get(self.current_floor, {})
@@ -663,6 +623,14 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             trim_left = current_trims_dict.get("trim_left", 0)
             trim_down = current_trims_dict.get("trim_down", 0)
             trim_right = current_trims_dict.get("trim_right", 0)
+
+            # Get current rotation from camera options or config
+            current_rotation = int(
+                self.camera_options.get(
+                    "rotate_image",
+                    self.camera_config.options.get("rotate_image", "0")
+                )
+            )
 
             # Create updated FloorData using common helper function
             updated_floor = create_floor_data(
@@ -725,7 +693,7 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
     ) -> ConfigFlowResult:
         """Add a new floor with trim settings."""
         if user_input is not None:
-            floor_id = user_input.get(CONF_FLOOR_NAME)
+            floor_id = str(user_input.get(CONF_FLOOR_NAME, ""))
             map_name = user_input.get(CONF_MAP_NAME, "")
 
             # Use existing trims_data as default for first floor if no floors exist yet
@@ -774,9 +742,14 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
 
         description = "Add a new floor. "
         if not self.floors_data:
-            description += "Existing auto-calculated trim values will be used for this first floor."
+            description += (
+                "Existing auto-calculated trim values will be used for this first floor."
+            )
         else:
-            description += "Enter trim values or leave at 0 to auto-calculate when you use 'Save Map Trims'."
+            description += (
+                "Enter trim values or leave at 0 to auto-calculate "
+                "when you use 'Save Map Trims'."
+            )
 
         return self.async_show_form(
             step_id="add_floor",
@@ -804,6 +777,7 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             trim_right = user_input.get(CONF_TRIM_RIGHT, 0)
 
             # Create updated floor data using common helper function
+            # Note: rotation is not stored in floor data - library uses global rotate_image setting
             updated_floor = create_floor_data(
                 floor_name=self.selected_floor,
                 trim_up=trim_up,
@@ -811,6 +785,7 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
                 trim_left=trim_left,
                 trim_right=trim_right,
                 map_name=map_name,
+                rotation=None,
             )
 
             # Update floors_data - store FloorData.to_dict() format
@@ -856,7 +831,12 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             data_schema=self._schemas.edit_floor_data_schema(floor_data),
             description_placeholders={
                 "floor_name": self.selected_floor,
-                "trim_info": f"Current trims: {trims_data.get('trim_up', 0)}, {trims_data.get('trim_left', 0)}, {trims_data.get('trim_down', 0)}, {trims_data.get('trim_right', 0)}",
+                "trim_info": (
+                    f"Current trims: {trims_data.get('trim_up', 0)}, "
+                    f"{trims_data.get('trim_left', 0)}, "
+                    f"{trims_data.get('trim_down', 0)}, "
+                    f"{trims_data.get('trim_right', 0)}"
+                ),
             },
         )
 
@@ -883,7 +863,9 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
                     else:
                         # No floors left in floors_data, check HA floors
                         ha_floors = self._get_ha_floors()
-                        new_current_floor = ha_floors[0]["floor_id"] if ha_floors else "floor_0"
+                        new_current_floor = (
+                            ha_floors[0]["floor_id"] if ha_floors else "floor_0"
+                        )
 
                 # Update instance variables
                 self.floors_data = updated_floors
@@ -910,25 +892,13 @@ class MQTTCameraOptionsFlowHandler(OptionsFlow):
             data_schema=self._schemas.edit_floor_select_schema(floor_options),
         )
 
-    async def async_step_save_options(self, user_input=None):
+    async def async_step_save_options(
+        self, user_input=None  # pylint: disable=unused-argument
+    ):
         """Save the options in a sorted way. It stores all the options."""
-        # Check if rotation was changed and create notification
-        rotation_changed = self._rotation_changed
-
         try:
             opt_update = await update_options(self.backup_options, self.camera_options)
             LOGGER.debug("updated options:%s", dict(opt_update))
-
-            # Create notification if rotation was changed
-            if rotation_changed:
-                persistent_notification.async_create(
-                    self.hass,
-                    "Rotation has been changed and trims have been reset to 0,0,0,0. "
-                    "Please go to Image Settings → Floor Management → Update Floor Data "
-                    "to save the new auto-calculated trims.",
-                    title="MQTT Vacuum Camera - Rotation Changed",
-                    notification_id=f"mqtt_camera_rotation_{self.camera_config.entry_id}",
-                )
 
             return self.async_create_entry(
                 title="",
