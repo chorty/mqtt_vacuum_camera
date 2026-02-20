@@ -9,7 +9,6 @@ from typing import Any, Dict, Optional
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult, OptionsFlow
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import floor_registry as fr
-from valetudo_map_parser import FloorData, TrimsData
 from valetudo_map_parser.config.types import RoomStore
 
 from .common import create_floor_data, extract_file_name, update_options
