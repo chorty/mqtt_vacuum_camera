@@ -376,7 +376,7 @@
       },
       "edit_floor": {
         "title": "Upravit nastavení podlahy",
-        "description": "Upravit název mapy pro patro: {floor_name}. {trim_info}. Hodnoty oříznutí se počítají automaticky – k jejich aktualizaci použijte 'Update Floor Data'.",
+        "description": "Upravit název mapy pro patro: {floor_name}. {trim_info}. Hodnoty oříznutí se počítají automaticky – k jejich aktualizaci použijte 'Aktualizovat údaje o podlaze'.",
         "data": {
           "floor_name": "Vyberte podlahu k úpravě",
           "map_name": "Název mapy (volitelné)"
