@@ -225,7 +225,8 @@ class OptionsSchemas:
                     COLOR_ROBOT, default=self.config_entry.options.get("color_robot")
                 ): ColorRGBSelector(),
                 vol.Optional(
-                    COLOR_CHARGER, default=self.config_entry.options.get("color_charger")
+                    COLOR_CHARGER,
+                    default=self.config_entry.options.get("color_charger"),
                 ): ColorRGBSelector(),
                 vol.Optional(
                     COLOR_MOVE, default=self.config_entry.options.get("color_move")
@@ -266,7 +267,8 @@ class OptionsSchemas:
                     ALPHA_ROBOT, default=self.config_entry.options.get("alpha_robot")
                 ): NumberSelector(self.config_dict),
                 vol.Optional(
-                    ALPHA_CHARGER, default=self.config_entry.options.get("alpha_charger")
+                    ALPHA_CHARGER,
+                    default=self.config_entry.options.get("alpha_charger"),
                 ): NumberSelector(self.config_dict),
                 vol.Optional(
                     ALPHA_MOVE, default=self.config_entry.options.get("alpha_move")
@@ -493,7 +495,9 @@ class OptionsSchemas:
 
         return vol.Schema(fields)
 
-    def select_floor_schema(self, floor_options: list, current_floor: str) -> vol.Schema:
+    def select_floor_schema(
+        self, floor_options: list, current_floor: str
+    ) -> vol.Schema:
         """Return floor selection schema.
 
         Args:
@@ -505,9 +509,7 @@ class OptionsSchemas:
         """
         return vol.Schema(
             {
-                vol.Required(
-                    CONF_CURRENT_FLOOR, default=current_floor
-                ): SelectSelector(
+                vol.Required(CONF_CURRENT_FLOOR, default=current_floor): SelectSelector(
                     SelectSelectorConfig(
                         options=floor_options,
                         mode=SelectSelectorMode.DROPDOWN,
@@ -516,7 +518,9 @@ class OptionsSchemas:
             }
         )
 
-    def add_floor_schema(self, available_floors: list, include_trims: bool) -> vol.Schema:
+    def add_floor_schema(
+        self, available_floors: list, include_trims: bool
+    ) -> vol.Schema:
         """Return add floor schema with optional trim fields.
 
         Args:
@@ -536,7 +540,9 @@ class OptionsSchemas:
                 )
             )
         else:
-            floor_selector = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
+            floor_selector = TextSelector(
+                TextSelectorConfig(type=TextSelectorType.TEXT)
+            )
 
         schema_fields = {
             vol.Required(CONF_FLOOR_NAME): floor_selector,
@@ -550,16 +556,24 @@ class OptionsSchemas:
             schema_fields.update(
                 {
                     vol.Optional(CONF_TRIM_UP, default=0): NumberSelector(
-                        NumberSelectorConfig(min=0, max=8000, mode=NumberSelectorMode.BOX)
+                        NumberSelectorConfig(
+                            min=0, max=8000, mode=NumberSelectorMode.BOX
+                        )
                     ),
                     vol.Optional(CONF_TRIM_LEFT, default=0): NumberSelector(
-                        NumberSelectorConfig(min=0, max=8000, mode=NumberSelectorMode.BOX)
+                        NumberSelectorConfig(
+                            min=0, max=8000, mode=NumberSelectorMode.BOX
+                        )
                     ),
                     vol.Optional(CONF_TRIM_DOWN, default=0): NumberSelector(
-                        NumberSelectorConfig(min=0, max=8000, mode=NumberSelectorMode.BOX)
+                        NumberSelectorConfig(
+                            min=0, max=8000, mode=NumberSelectorMode.BOX
+                        )
                     ),
                     vol.Optional(CONF_TRIM_RIGHT, default=0): NumberSelector(
-                        NumberSelectorConfig(min=0, max=8000, mode=NumberSelectorMode.BOX)
+                        NumberSelectorConfig(
+                            min=0, max=8000, mode=NumberSelectorMode.BOX
+                        )
                     ),
                 }
             )
@@ -624,4 +638,3 @@ class OptionsSchemas:
                 ),
             }
         )
-

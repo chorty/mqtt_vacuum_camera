@@ -303,17 +303,27 @@ class ThreadPoolManager:
     async def shutdown_all(cls):
         """Shutdown all pools across all vacuums."""
         LOGGER.debug("Shutting down all thread pools across all instances")
-        instances = list(cls._instances.items())
+
+        # Acquire class lock to safely read instances
+        with cls._instances_lock:
+            instances = list(cls._instances.items())
+
+        # Shutdown each instance's pools with proper locking
         for _, instance in instances:
             # pylint: disable=protected-access
             # Intentional: shutdown_all() needs to access all instances' pools
-            for pool_name, pool in list(instance._pools.items()):
+            with instance._pool_lock:
+                pools_to_shutdown = list(instance._pools.items())
+
+            for pool_name, pool in pools_to_shutdown:
                 LOGGER.debug("Shutdown for pool: %s", pool_name)
                 try:
                     pool.shutdown(wait=False)
                 except Exception as e:
                     LOGGER.warning("Error shutting down pool %s: %s", pool_name, e)
 
-        cls.get_instance.cache_clear()
-        cls._instances.clear()
+        # Clear cache and instances under class lock
+        with cls._instances_lock:
+            cls.get_instance.cache_clear()
+            cls._instances.clear()
         LOGGER.info("Thread pools and instances cleared")
